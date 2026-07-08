@@ -1,17 +1,30 @@
-import socket
-import threading
+import threading, socket
 from f1_23_telemetry.listener import TelemetryListener
 from f1_23_telemetry.appendices import TRACK_IDS
 import matplotlib.pyplot as plt
 
-def get_udp_data() -> tuple:
-    hostname = socket.gethostname()
-    IP_ADDRESS = socket.gethostbyname(hostname)
-    UDP_PORT = 1000
-    return IP_ADDRESS, UDP_PORT
+hostname = socket.gethostname()
+ip_address = socket.gethostbyname(hostname)
+
+class TelemetrySession:
+    def __init__(self, port=20777, host=ip_address):
+        self.stop_event = threading.Event()
+        self.listener = TelemetryListener(port=port, host=host)
+        self.result = []
+        self.thread = threading.Thread(target=self._collect, daemon=True)
+        self.thread.start()
+
+    def _collect(self):
+        self.result[0] = _collect_data(self.stop_event, self.listener)
+
+    def stop(self):
+        self.stop_event.set()
+        self.listener.socket.close()
+        self.thread.join()
+        return self.result[0]
 
 
-def start_f123_lap_telemetry(stop_event: threading.Event, ip_address: str, port: int):
+def _collect_data(stop_event: threading.Event, listener: TelemetryListener):
     speed = []
     throttle = []
     brake = []
@@ -20,11 +33,12 @@ def start_f123_lap_telemetry(stop_event: threading.Event, ip_address: str, port:
     lap_starts = []
     last_lap = 0
 
-    listener = TelemetryListener(port=port, host=ip_address)
-    print("Listening for F1 23 telemetry packets...")
-
     while not stop_event.is_set():
-        packet = listener.get()
+        try:
+            packet = listener.get()
+        except OSError:
+            break
+
         packet_id = packet.header.packet_id
 
         if packet_id == 1:
@@ -52,9 +66,7 @@ def start_f123_lap_telemetry(stop_event: threading.Event, ip_address: str, port:
             brake.append(int(player_telemetry.brake * 100))
             steering.append(player_telemetry.steer)
 
-    print("\nTelemetry collection stopped.")
-
-    data = {
+    return {
         "speed": speed,
         "throttle": throttle,
         "brake": brake,
@@ -62,7 +74,6 @@ def start_f123_lap_telemetry(stop_event: threading.Event, ip_address: str, port:
         "g_force_lat": g_force_lat,
         "lap_starts": lap_starts,
     }
-    return data
 
 
 def plot_telemetry(data):
