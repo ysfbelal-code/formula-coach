@@ -6,94 +6,103 @@ import matplotlib.pyplot as plt
 hostname = socket.gethostname()
 ip_address = socket.gethostbyname(hostname)
 
-_backend = None
-_running = False
-_thread = None
-_listener = None
-_data = None
+if "active" not in st.session_state:
+    st.session_state.active = False
+    st.session_state.data = None
+    st.session_state.listener = None
+    st.session_state.thread = None
+    st.session_state.evt = None
+    st.session_state.result = None
 
 
 def backend_available():
-    global _backend
-    if _backend is None:
-        try:
-            from f1_23_telemetry.listener import TelemetryListener
-            _backend = True
-        except ImportError:
-            _backend = False
-    return _backend
+    try:
+        from f1_23_telemetry.listener import TelemetryListener
+        return True
+    except ImportError:
+        return False
 
 
-def start(port=65535, host=ip_address):
-    global _running, _thread, _listener, _data
-    if _running:
-        return
-    if not backend_available():
-        raise RuntimeError("f1_23_telemetry not installed")
+def start():
     from f1_23_telemetry.listener import TelemetryListener
     from f1_23_telemetry.appendices import TRACK_IDS
-    _data = None
-    _listener = TelemetryListener(port=port, host=host)
-    _running = True
-    _thread = threading.Thread(target=lambda: _run(TRACK_IDS), daemon=True)
-    _thread.start()
+
+    evt = threading.Event()
+    result = [None]
+
+    def collect():
+        speed = []
+        throttle = []
+        brake = []
+        steering = []
+        g_force_lat = []
+        lap_starts = []
+        last_lap = 0
+
+        result[0] = {
+            "speed": speed, "throttle": throttle, "brake": brake,
+            "steering": steering, "g_force_lat": g_force_lat, "lap_starts": lap_starts,
+        }
+
+        try:
+            listener = st.session_state.listener
+            while not evt.is_set():
+                try:
+                    packet = listener.get()
+                except OSError:
+                    break
+
+                pid = packet.header.packet_id
+
+                if pid == 1:
+                    print(f"Track: {TRACK_IDS.get(packet.track_id, 'Unknown')}")
+                elif pid == 2:
+                    idx = packet.header.player_car_index
+                    lap = packet.lap_data[idx].current_lap_num
+                    if lap != last_lap:
+                        lap_starts.append(len(speed))
+                        print(f"Lap {lap} start")
+                        last_lap = lap
+                elif pid == 0:
+                    idx = packet.header.player_car_index
+                    g_force_lat.append(packet.car_motion_data[idx].g_force_lateral)
+                elif pid == 6:
+                    idx = packet.header.player_car_index
+                    t = packet.car_telemetry_data[idx]
+                    speed.append(t.speed)
+                    throttle.append(int(t.throttle * 100))
+                    brake.append(int(t.brake * 100))
+                    steering.append(t.steer)
+        except Exception:
+            pass
+
+        result[0] = {
+            "speed": speed, "throttle": throttle, "brake": brake,
+            "steering": steering, "g_force_lat": g_force_lat, "lap_starts": lap_starts,
+        }
+
+    st.session_state.listener = TelemetryListener(port=27000, host="0.0.0.0")
+    st.session_state.evt = evt
+    st.session_state.result = result
+    st.session_state.thread = threading.Thread(target=collect, daemon=True)
+    st.session_state.thread.start()
+    st.session_state.data = None
+    st.session_state.active = True
 
 
 def stop():
-    global _running, _listener, _thread, _data
-    if not _running:
-        return
-    _running = False
-    if _listener is not None:
-        _listener.socket.close()
-    if _thread is not None:
-        _thread.join()
-
-
-def get_data():
-    return _data
-
-def _run(track_ids):
-    global _data
-
-    speed, throttle, brake, steering, g_force_lat, lap_starts = ([] for _ in range(6))
-    last_lap = 0
-
-    try:
-        while _running:
-            try:
-                packet = _listener.get()
-            except OSError:
-                break
-
-            pid = packet.header.packet_id
-
-            if pid == 1:
-                print(f"Track: {track_ids.get(packet.track_id, 'Unknown')}")
-            elif pid == 2:
-                idx = packet.header.player_car_index
-                lap = packet.lap_data[idx].current_lap_num
-                if lap != last_lap:
-                    lap_starts.append(len(speed))
-                    print(f"Lap {lap} start")
-                    last_lap = lap
-            elif pid == 0:
-                idx = packet.header.player_car_index
-                g_force_lat.append(packet.car_motion_data[idx].g_force_lateral)
-            elif pid == 6:
-                idx = packet.header.player_car_index
-                t = packet.car_telemetry_data[idx]
-                speed.append(t.speed)
-                throttle.append(int(t.throttle * 100))
-                brake.append(int(t.brake * 100))
-                steering.append(t.steer)
-    except Exception:
-        pass
-
-    _data = {
-        "speed": speed, "throttle": throttle, "brake": brake,
-        "steering": steering, "g_force_lat": g_force_lat, "lap_starts": lap_starts,
-    }
+    if st.session_state.evt is not None:
+        st.session_state.evt.set()
+    if st.session_state.listener is not None:
+        try:
+            st.session_state.listener.socket.close()
+        except OSError:
+            pass
+    if st.session_state.thread is not None:
+        st.session_state.thread.join()
+    if st.session_state.result is not None:
+        st.session_state.data = st.session_state.result[0]
+    st.session_state.active = False
 
 
 def plot(data):
@@ -127,32 +136,26 @@ st.title("Formula Coach")
 
 st.text(
     f"Settings -> Telemetry Settings:\n"
-    f"UDP IP Address: {ip_address}\nUDP Port: 65535\n"
+    f"UDP IP Address: {ip_address}\nUDP Port: 27000\n"
     "No data stored."
 )
-
-if "active_lap_telemetry" not in st.session_state:
-    st.session_state.active_lap_telemetry = False
 
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("Start") and not st.session_state.active_lap_telemetry:
+    if st.button("Start") and not st.session_state.active:
         if not backend_available():
             st.error("f1_23_telemetry not installed. pip install f1-23-telemetry")
         else:
             start()
-            st.session_state.active_lap_telemetry = True
             st.rerun()
 
 with col2:
-    if st.button("Stop") and st.session_state.active_lap_telemetry:
+    if st.button("Stop") and st.session_state.active:
         stop()
-        st.session_state.active_lap_telemetry = False
+        st.rerun()
 
-if st.session_state.active_lap_telemetry:
+if st.session_state.active:
     st.info("Collecting telemetry... Press Stop to finish.")
-else:
-    d = get_data()
-    if d is not None:
-        st.pyplot(plot(d))
+elif st.session_state.data is not None:
+    st.pyplot(plot(st.session_state.data))
