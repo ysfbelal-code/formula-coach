@@ -50,11 +50,8 @@ def stop():
         _thread.join()
 
 
-def pop():
-    global _data
-    d = _data
-    _data = None
-    return d
+def get_data():
+    return _data
 
 
 def _run(track_ids):
@@ -158,6 +155,6 @@ with col2:
 if st.session_state.active_lap_telemetry:
     st.info("Collecting telemetry... Press Stop to finish.")
 else:
-    d = pop()
+    d = get_data()
     if d is not None:
         st.pyplot(plot(d))
