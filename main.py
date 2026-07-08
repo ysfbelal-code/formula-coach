@@ -24,7 +24,7 @@ def backend_available():
     return _backend
 
 
-def start(port=1024, host=ip_address):
+def start(port=50000, host=ip_address):
     global _running, _thread, _listener, _data
     if _running:
         return
@@ -52,7 +52,6 @@ def stop():
 
 def get_data():
     return _data
-
 
 def _run(track_ids):
     global _data
@@ -128,7 +127,7 @@ st.title("Formula Coach")
 
 st.text(
     f"Settings -> Telemetry Settings:\n"
-    f"UDP IP Address: {ip_address}\nUDP Port: 1024\n"
+    f"UDP IP Address: {ip_address}\nUDP Port: 27000\n"
     "No data stored."
 )
 
@@ -150,7 +149,6 @@ with col2:
     if st.button("Stop") and st.session_state.active_lap_telemetry:
         stop()
         st.session_state.active_lap_telemetry = False
-        st.rerun()
 
 if st.session_state.active_lap_telemetry:
     st.info("Collecting telemetry... Press Stop to finish.")
