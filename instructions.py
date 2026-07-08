@@ -1,0 +1,1 @@
+text = f"Before you start, go to Settings -> Telemetry Settings, and insert the following values: \nUDP IP Address: {ip_address}\nUDP Port: {port}\nKeep in mind that NO data, for any reason whatsoever, is stored in our files. This is so that the UDP telemetry can send the input data to the program for it to work."
