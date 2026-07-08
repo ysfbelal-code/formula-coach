@@ -31,10 +31,11 @@ def start(port=27000, host=ip_address):
     if not backend_available():
         raise RuntimeError("f1_23_telemetry not installed")
     from f1_23_telemetry.listener import TelemetryListener
+    from f1_23_telemetry.appendices import TRACK_IDS
     _data = None
     _listener = TelemetryListener(port=port, host=host)
     _running = True
-    _thread = threading.Thread(target=_run, daemon=True)
+    _thread = threading.Thread(target=lambda: _run(TRACK_IDS), daemon=True)
     _thread.start()
 
 
@@ -56,40 +57,42 @@ def pop():
     return d
 
 
-def _run():
+def _run(track_ids):
     global _data
-    from f1_23_telemetry.appendices import TRACK_IDS
 
     speed, throttle, brake, steering, g_force_lat, lap_starts = ([] for _ in range(6))
     last_lap = 0
 
-    while _running:
-        try:
-            packet = _listener.get()
-        except OSError:
-            break
+    try:
+        while _running:
+            try:
+                packet = _listener.get()
+            except OSError:
+                break
 
-        pid = packet.header.packet_id
+            pid = packet.header.packet_id
 
-        if pid == 1:
-            print(f"Track: {TRACK_IDS.get(packet.track_id, 'Unknown')}")
-        elif pid == 2:
-            idx = packet.header.player_car_index
-            lap = packet.lap_data[idx].current_lap_num
-            if lap != last_lap:
-                lap_starts.append(len(speed))
-                print(f"Lap {lap} start")
-                last_lap = lap
-        elif pid == 0:
-            idx = packet.header.player_car_index
-            g_force_lat.append(packet.car_motion_data[idx].g_force_lateral)
-        elif pid == 6:
-            idx = packet.header.player_car_index
-            t = packet.car_telemetry_data[idx]
-            speed.append(t.speed)
-            throttle.append(int(t.throttle * 100))
-            brake.append(int(t.brake * 100))
-            steering.append(t.steer)
+            if pid == 1:
+                print(f"Track: {track_ids.get(packet.track_id, 'Unknown')}")
+            elif pid == 2:
+                idx = packet.header.player_car_index
+                lap = packet.lap_data[idx].current_lap_num
+                if lap != last_lap:
+                    lap_starts.append(len(speed))
+                    print(f"Lap {lap} start")
+                    last_lap = lap
+            elif pid == 0:
+                idx = packet.header.player_car_index
+                g_force_lat.append(packet.car_motion_data[idx].g_force_lateral)
+            elif pid == 6:
+                idx = packet.header.player_car_index
+                t = packet.car_telemetry_data[idx]
+                speed.append(t.speed)
+                throttle.append(int(t.throttle * 100))
+                brake.append(int(t.brake * 100))
+                steering.append(t.steer)
+    except Exception:
+        pass
 
     _data = {
         "speed": speed, "throttle": throttle, "brake": brake,
