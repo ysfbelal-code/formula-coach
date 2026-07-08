@@ -1,54 +1,36 @@
-import threading
 import streamlit as st
-from f1_23_data import create_listener, start_f123_lap_telemetry, plot_telemetry, ip_address
+from f1_23_data import start_collection, stop_collection, pop_data, plot_telemetry, ip_address
 
 st.set_page_config("Formula Coach")
 st.title("Formula Coach")
 
-text = f"Before you start, go to Settings -> Telemetry Settings, and insert the following values: \nUDP IP Address: {ip_address}\nUDP Port: 27000\n\nKeep in mind that NO data, for any reason whatsoever, is stored in our files. This is so that the UDP telemetry can send the input data to the program for it to work."
-st.text(text)
+st.text(
+    f"Before you start, go to Settings -> Telemetry Settings, and insert the following values:\n"
+    f"UDP IP Address: {ip_address}\nUDP Port: 27000\n\n"
+    "No data is stored. UDP telemetry sends input data to this program only."
+)
 
-if "running" not in st.session_state:
-    st.session_state.running = False
-    st.session_state.stop_event = None
-    st.session_state.listener = None
-    st.session_state.result = None
-    st.session_state.thread = None
-    st.session_state.data = None
+if "active_lap_telemetry" not in st.session_state:
+    st.session_state.active_lap_telemetry = False
 
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("Start") and not st.session_state.running:
-        stop_event = threading.Event()
-        listener = create_listener()
-        result = [None]
-
-        def collect():
-            result[0] = start_f123_lap_telemetry(stop_event, listener)
-
-        thread = threading.Thread(target=collect, daemon=True)
-        thread.start()
-
-        st.session_state.stop_event = stop_event
-        st.session_state.listener = listener
-        st.session_state.result = result
-        st.session_state.thread = thread
-        st.session_state.running = True
+    if st.button("Start") and not st.session_state.active_lap_telemetry:
+        start_collection()
+        st.session_state.active_lap_telemetry = True
         st.rerun()
 
 with col2:
-    if st.button("Stop") and st.session_state.running and st.session_state.thread is not None:
-        st.session_state.stop_event.set()
-        st.session_state.listener.socket.close()
-        st.session_state.thread.join()
-        st.session_state.data = st.session_state.result[0]
-        st.session_state.running = False
+    if st.button("Stop") and st.session_state.active_lap_telemetry:
+        stop_collection()
+        st.session_state.active_lap_telemetry = False
         st.rerun()
 
-if st.session_state.running:
+if st.session_state.active_lap_telemetry:
     st.info("Collecting telemetry... Press Stop to finish.")
-
-if st.session_state.data is not None:
-    fig = plot_telemetry(st.session_state.data)
-    st.pyplot(fig)
+else:
+    data = pop_data()
+    if data is not None:
+        fig = plot_telemetry(data)
+        st.pyplot(fig)
