@@ -1,5 +1,5 @@
 import streamlit as st
-from f1_23_data import start_collection, stop_collection, pop_data, plot_telemetry, ip_address
+from data_backend import start_collection, stop_collection, pop_data, plot_telemetry, ip_address
 
 st.set_page_config("Formula Coach")
 st.title("Formula Coach")
