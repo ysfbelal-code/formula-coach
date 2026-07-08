@@ -1,19 +1,13 @@
 import threading
 import streamlit as st
 from f1_23_data import start_f123_lap_telemetry, plot_telemetry, get_udp_data
+from instructions import text
 
 st.set_page_config("Formula Coach")
 st.title("Formula Coach")
 udp_details = get_udp_data()
 ip_address = udp_details[0]
 port = udp_details[1]
-
-text = ("Before you start, go to Settings -> Telemetry Settings, and insert the following value:"
-    f"\nUDP IP Address: {ip_address}\n"
-    f"UDP Port: {port}\n", 
-    "Keep in mind that NO data, for any reason whatsoever, is stored in our files."
-    "This is so that the UDP telemetry can send the input data to the program for it to work."
-)
 
 st.text(text)
 if "stop_event" not in st.session_state:
