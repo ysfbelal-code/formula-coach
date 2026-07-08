@@ -1,30 +1,21 @@
-import threading, socket
+import threading
 from f1_23_telemetry.listener import TelemetryListener
 from f1_23_telemetry.appendices import TRACK_IDS
 import matplotlib.pyplot as plt
-
-hostname = socket.gethostname()
-ip_address = socket.gethostbyname(hostname)
-
-class TelemetrySession:
-    def __init__(self, port=20777, host=ip_address):
-        self.stop_event = threading.Event()
-        self.listener = TelemetryListener(port=port, host=host)
-        self.result = []
-        self.thread = threading.Thread(target=self._collect, daemon=True)
-        self.thread.start()
-
-    def _collect(self):
-        self.result[0] = _collect_data(self.stop_event, self.listener)
-
-    def stop(self):
-        self.stop_event.set()
-        self.listener.socket.close()
-        self.thread.join()
-        return self.result[0]
+import socket
 
 
-def _collect_data(stop_event: threading.Event, listener: TelemetryListener):
+def get_ip_address():
+    hostname = socket.gethostname()
+    return socket.gethostbyname(hostname)
+
+ip_address = get_ip_address()
+
+def create_listener(port=27000, host=ip_address):
+    return TelemetryListener(port=port, host=host)
+
+
+def start_f123_lap_telemetry(stop_event: threading.Event, listener: TelemetryListener):
     speed = []
     throttle = []
     brake = []
