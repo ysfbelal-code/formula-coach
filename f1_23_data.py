@@ -1,22 +1,36 @@
 import threading
 import socket
-from f1_23_telemetry.listener import TelemetryListener
-from f1_23_telemetry.appendices import TRACK_IDS
 import matplotlib.pyplot as plt
 
 hostname = socket.gethostname()
 ip_address = socket.gethostbyname(hostname)
 
+_backend = None
 _running = False
 _thread = None
 _listener = None
 _data = None
 
 
+def backend_available():
+    global _backend
+    if _backend is None:
+        try:
+            from f1_23_telemetry.listener import TelemetryListener
+            _backend = True
+        except ImportError:
+            _backend = False
+    return _backend
+
+
 def start(port=27000, host=ip_address):
     global _running, _thread, _listener, _data
     if _running:
         return
+    if not backend_available():
+        raise RuntimeError("f1_23_telemetry not installed. pip install f1-23-telemetry")
+    from f1_23_telemetry.listener import TelemetryListener
+
     _data = None
     _listener = TelemetryListener(port=port, host=host)
     _running = True
@@ -44,6 +58,7 @@ def pop():
 
 def _run():
     global _data
+    from f1_23_telemetry.appendices import TRACK_IDS
 
     speed = []
     throttle = []
