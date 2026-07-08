@@ -8,12 +8,14 @@ udp_details = get_udp_data()
 ip_address = udp_details[0]
 port = udp_details[1]
 
-st.text(
-    "Before you start, go to Settings -> Telemetry Settings, and insert the following value:"
+text = ("Before you start, go to Settings -> Telemetry Settings, and insert the following value:"
     f"\nUDP IP Address: {ip_address}\n"
     f"UDP Port: {port}\n", 
-    "Keep in mind that NO data, for any reason whatsoever, is stored in our files. This is so that the UDP telemetry can send the input data to the program for it to work."
-    )
+    "Keep in mind that NO data, for any reason whatsoever, is stored in our files."
+    "This is so that the UDP telemetry can send the input data to the program for it to work."
+)
+
+st.text(text)
 if "stop_event" not in st.session_state:
     st.session_state.stop_event = threading.Event()
     st.session_state.running = False
