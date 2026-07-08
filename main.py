@@ -24,7 +24,7 @@ def backend_available():
     return _backend
 
 
-def start(port=50000, host=ip_address):
+def start(port=1024, host=ip_address):
     global _running, _thread, _listener, _data
     if _running:
         return
@@ -128,7 +128,7 @@ st.title("Formula Coach")
 
 st.text(
     f"Settings -> Telemetry Settings:\n"
-    f"UDP IP Address: {ip_address}\nUDP Port: 27000\n"
+    f"UDP IP Address: {ip_address}\nUDP Port: 1024\n"
     "No data stored."
 )
 
