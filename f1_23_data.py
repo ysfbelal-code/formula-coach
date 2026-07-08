@@ -1,21 +1,50 @@
 import threading
+import socket
 from f1_23_telemetry.listener import TelemetryListener
 from f1_23_telemetry.appendices import TRACK_IDS
 import matplotlib.pyplot as plt
-import socket
+
+hostname = socket.gethostname()
+ip_address = socket.gethostbyname(hostname)
+
+_running = False
+_thread = None
+_listener = None
+_data = None
 
 
-def get_ip_address():
-    hostname = socket.gethostname()
-    return socket.gethostbyname(hostname)
+def start(port=27000, host=ip_address):
+    global _running, _thread, _listener, _data
+    if _running:
+        return
+    _data = None
+    _listener = TelemetryListener(port=port, host=host)
+    _running = True
+    _thread = threading.Thread(target=_run, daemon=True)
+    _thread.start()
 
-ip_address = get_ip_address()
 
-def create_listener(port=27000, host=ip_address):
-    return TelemetryListener(port=port, host=host)
+def stop():
+    global _running, _listener, _thread, _data
+    if not _running:
+        return
+    _running = False
+    if _listener is not None:
+        _listener.socket.close()
+    if _thread is not None:
+        _thread.join()
 
 
-def start_f123_lap_telemetry(stop_event: threading.Event, listener: TelemetryListener):
+def pop():
+    global _data
+    d = _data
+    _data = None
+    return d
+
+
+def _run():
+    global _data
+
     speed = []
     throttle = []
     brake = []
@@ -24,40 +53,39 @@ def start_f123_lap_telemetry(stop_event: threading.Event, listener: TelemetryLis
     lap_starts = []
     last_lap = 0
 
-    while not stop_event.is_set():
+    while _running:
         try:
-            packet = listener.get()
+            packet = _listener.get()
         except OSError:
             break
 
-        packet_id = packet.header.packet_id
+        pid = packet.header.packet_id
 
-        if packet_id == 1:
+        if pid == 1:
             track = TRACK_IDS.get(packet.track_id, "Unknown")
-            print(f"Track: {track} (id={packet.track_id})")
+            print(f"Track: {track}")
 
-        if packet_id == 2:
-            player_car_idx = packet.header.player_car_index
-            lap = packet.lap_data[player_car_idx].current_lap_num
+        if pid == 2:
+            idx = packet.header.player_car_index
+            lap = packet.lap_data[idx].current_lap_num
             if lap != last_lap:
                 lap_starts.append(len(speed))
                 print(f"Lap {lap} start")
                 last_lap = lap
 
-        if packet_id == 0:
-            player_car_idx = packet.header.player_car_index
-            g_force_lat.append(packet.car_motion_data[player_car_idx].g_force_lateral)
+        if pid == 0:
+            idx = packet.header.player_car_index
+            g_force_lat.append(packet.car_motion_data[idx].g_force_lateral)
 
-        if packet_id == 6:
-            player_car_idx = packet.header.player_car_index
-            player_telemetry = packet.car_telemetry_data[player_car_idx]
+        if pid == 6:
+            idx = packet.header.player_car_index
+            t = packet.car_telemetry_data[idx]
+            speed.append(t.speed)
+            throttle.append(int(t.throttle * 100))
+            brake.append(int(t.brake * 100))
+            steering.append(t.steer)
 
-            speed.append(player_telemetry.speed)
-            throttle.append(int(player_telemetry.throttle * 100))
-            brake.append(int(player_telemetry.brake * 100))
-            steering.append(player_telemetry.steer)
-
-    return {
+    _data = {
         "speed": speed,
         "throttle": throttle,
         "brake": brake,
@@ -67,7 +95,7 @@ def start_f123_lap_telemetry(stop_event: threading.Event, listener: TelemetryLis
     }
 
 
-def plot_telemetry(data):
+def plot(data):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
     ax1.plot(data["speed"], label="Speed (km/h)", color="cyan")
