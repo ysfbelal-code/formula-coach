@@ -9,6 +9,8 @@ st.text(text)
 
 if "running" not in st.session_state:
     st.session_state.running = False
+    st.session_state.session = None
+    st.session_state.data = None
 
 col1, col2 = st.columns(2)
 
@@ -19,7 +21,7 @@ with col1:
         st.rerun()
 
 with col2:
-    if st.button("Stop") and st.session_state.running:
+    if st.button("Stop") and st.session_state.running and st.session_state.session is not None:
         data = st.session_state.session.stop()
         st.session_state.data = data
         st.session_state.running = False
