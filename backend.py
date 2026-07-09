@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 hostname = socket.gethostname()
 IP_ADDRESS = socket.gethostbyname(hostname)
-UDP_PORT = 65535
+UDP_PORT = 20777
 
 speed = []
 throttle = []
@@ -14,11 +14,12 @@ steering = []
 g_force_lat = []
 lap_starts = []
 last_lap = 0
+    
+def start_telemetry_listener():
+    global last_lap
+    listener = TelemetryListener(port=UDP_PORT, host=IP_ADDRESS)
+    print("Listening for F1 23 telemetry packets...")
 
-listener = TelemetryListener(port=UDP_PORT, host=IP_ADDRESS)
-print("Listening for F1 23 telemetry packets...")
-
-try:
     while True:
         packet = listener.get()
         packet_id = packet.header.packet_id
@@ -43,19 +44,19 @@ try:
             player_car_idx = packet.header.player_car_index
             s = packet.car_setups[player_car_idx]
             print(
-                f"Setup — Wing: {s.front_wing}/{s.rear_wing}  "
-                f"Diff: {s.on_throttle}/{s.off_throttle}  "
-                f"Camber: {s.front_camber:.1f}/{s.rear_camber:.1f}  "
-                f"Toe: {s.front_toe:.1f}/{s.rear_toe:.1f}  "
-                f"Susp: {s.front_suspension}/{s.rear_suspension}  "
-                f"ARB: {s.front_anti_roll_bar}/{s.rear_anti_roll_bar}  "
-                f"Height: {s.front_suspension_height}/{s.rear_suspension_height}  "
-                f"Brake: {s.brake_pressure}%/{s.brake_bias}%  "
-                f"Tyres(PSI): {s.front_left_tyre_pressure:.1f}/{s.front_right_tyre_pressure:.1f}/"
-                f"{s.rear_left_tyre_pressure:.1f}/{s.rear_right_tyre_pressure:.1f}  "
-                f"Ballast: {s.ballast}  Fuel: {s.fuel_load:.1f}"
+                    f"Setup — Wing: {s.front_wing}/{s.rear_wing}  "
+                    f"Diff: {s.on_throttle}/{s.off_throttle}  "
+                    f"Camber: {s.front_camber:.1f}/{s.rear_camber:.1f}  "
+                    f"Toe: {s.front_toe:.1f}/{s.rear_toe:.1f}  "
+                    f"Susp: {s.front_suspension}/{s.rear_suspension}  "
+                    f"ARB: {s.front_anti_roll_bar}/{s.rear_anti_roll_bar}  "
+                    f"Height: {s.front_suspension_height}/{s.rear_suspension_height}  "
+                    f"Brake: {s.brake_pressure}%/{s.brake_bias}%  "
+                    f"Tyres(PSI): {s.front_left_tyre_pressure:.1f}/{s.front_right_tyre_pressure:.1f}/"
+                    f"{s.rear_left_tyre_pressure:.1f}/{s.rear_right_tyre_pressure:.1f}  "
+                    f"Ballast: {s.ballast}  Fuel: {s.fuel_load:.1f}"
             )
-            
+                
         if packet_id == 6:
             player_car_idx = packet.header.player_car_index
             t = packet.car_telemetry_data[player_car_idx]
@@ -64,9 +65,8 @@ try:
             brake.append(int(t.brake * 100))
             steering.append(t.steer)
 
-except KeyboardInterrupt:
+def start_plotting_telemetry():
     print("\nStopping. Plotting...")
-
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
     ax1.plot(speed, label="Speed (km/h)", color="cyan")
@@ -89,4 +89,4 @@ except KeyboardInterrupt:
     ax2.set_title("Steering & Cornering")
 
     plt.tight_layout()
-    plt.show()
+    return fig
